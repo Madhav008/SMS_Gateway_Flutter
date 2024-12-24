@@ -1,16 +1,32 @@
 # my_sms
 
-A new Flutter project.
+This is a simple flutter app that sends and receives SMS using local computer as server
+The app currently only works on Windows and Linux
+The computer needs to have a working internet connection and a phone connected to the computer
 
-## Getting Started
+## API Endpoints
 
-This project is a starting point for a Flutter application.
+### POST /sms
 
-A few resources to get you started if this is your first Flutter project:
+Send SMS to the given phone number
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+- body:
+  - phone_number: string
+  - message: string
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+### GET /sms
+
+Get all received SMS
+
+- query:
+  - phone_number: string
+
+### GET /sms/:id
+
+Get the SMS with the given ID
+
+- path:
+  - id: string
+
+### DELETE /sms/:id
+
