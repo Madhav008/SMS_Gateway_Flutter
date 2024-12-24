@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:my_sms/controller/sms_controller.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
 
@@ -166,10 +167,9 @@ Future<void> handlePostSMS(HttpRequest request) async {
       // Simulate sending the SMS (Replace with actual logic)
       print('Sending SMS to ${data['number']}: ${data['message']}');
 
-      // Simulate delivery status update (for example, after 5 seconds)
-      Future.delayed(Duration(seconds: 5), () async {
-        await dbHelper.updateSMSStatus(id, 'Delivered');
-      });
+      await SmsController().sendSms(newMessage.number, newMessage.message);
+      
+      await dbHelper.updateSMSStatus(id, 'Delivered');
 
       request.response
         ..statusCode = HttpStatus.created

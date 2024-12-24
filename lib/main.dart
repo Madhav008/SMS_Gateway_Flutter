@@ -1,20 +1,31 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_foreground_task/flutter_foreground_task.dart';
 import 'package:my_sms/Api/routes.dart';
 import 'package:my_sms/Api/server.dart';
+import 'package:my_sms/TaskHandler.dart';
 import 'package:my_sms/section.dart';
 
 void main() {
+  FlutterForegroundTask.initCommunicationPort();
   runApp(MyApp());
+}
+
+// The callback function should always be a top-level or static function.
+@pragma('vm:entry-point')
+void startCallback(String? id) {
+  print("Stoping the server");
+  // Handle the button press
+  if (id == 'btn_hello') {
+    // Stop the server and stop the service
+    stopServer();
+    FlutterForegroundTask.stopService();
+  }
 }
 
 class MyApp extends StatefulWidget {
   static const platform = MethodChannel('com.yourpackage/sms');
-  HttpServer? _server;
-  String _localIp = "Not started";
-  String _publicIp = "Fetching...";
-  int? _port;
 
   @override
   State<MyApp> createState() => _MyAppState();
@@ -22,6 +33,7 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   static const platform = MethodChannel('com.yourpackage/sms');
+  MyTaskHandler _taskHandler = MyTaskHandler();
 
   // Method to send SMS
   Future<void> sendSms(String phoneNumber, String message) async {
@@ -38,61 +50,90 @@ class _MyAppState extends State<MyApp> {
 
   // Updated _startServer Method
   Future<void> _startServer() async {
-    _fetchPublicIp();
-    try {
-      final serverInfo =
-          await startServer(); // Use startServer from server.dart
-      setState(() {
-        widget._localIp = (serverInfo as Map<String, dynamic>)['ip'];
-        widget._port = (serverInfo as Map<String, dynamic>)['port'];
-      });
-      print('Server started on IP ${widget._localIp} and port ${widget._port}');
-    } catch (e) {
-      print("Error starting server: $e");
-    }
-  }
-
-  // Method to fetch public IP
-  Future<void> _fetchPublicIp() async {
-    try {
-      final result = await InternetAddress.lookup('api.ipify.org');
-      final ipv4 = result
-          .firstWhere((element) => element.type == InternetAddressType.IPv4);
-      if (ipv4 != null) {
-        setState(() {
-          widget._publicIp = result[0].address;
-        });
-      }
-    } catch (e) {
-      setState(() {
-        widget._publicIp = "Error fetching public IP";
-      });
-      print("Error fetching public IP: $e");
-    }
+    await _taskHandler.startServerHandler();
+    _startService();
+    setState(() {});
   }
 
   // Method to stop server
   Future<void> _stopServer() async {
-    try {
-      await stopServer(); // Use stopServer from server.dart
-      setState(() {
-        widget._localIp = "Not started";
-        widget._port = null;
-        widget._publicIp = "Fetching...";
-      });
-    } catch (e) {
-      print("Error stopping server: $e");
+    await _taskHandler.stopServerHandler();
+    FlutterForegroundTask.stopService();
+    setState(() {});
+  }
+
+  Future<void> _requestPermissions() async {
+    // Android 13+, you need to allow notification permission to display foreground service notification.
+    //
+    // iOS: If you need notification, ask for permission.
+    final NotificationPermission notificationPermission =
+        await FlutterForegroundTask.checkNotificationPermission();
+    if (notificationPermission != NotificationPermission.granted) {
+      await FlutterForegroundTask.requestNotificationPermission();
+    }
+
+    if (Platform.isAndroid) {
+      // Android 12+, there are restrictions on starting a foreground service.
+      //
+      // To restart the service on device reboot or unexpected problem, you need to allow below permission.
+      if (!await FlutterForegroundTask.isIgnoringBatteryOptimizations) {
+        // This function requires `android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS` permission.
+        await FlutterForegroundTask.requestIgnoreBatteryOptimization();
+      }
     }
   }
 
+  void _initService() {
+    FlutterForegroundTask.init(
+      androidNotificationOptions: AndroidNotificationOptions(
+        channelId: 'foreground_service',
+        channelName: 'Foreground Service Notification',
+        channelDescription:
+            'This notification appears when the foreground service is running.',
+        onlyAlertOnce: true,
+      ),
+      iosNotificationOptions: const IOSNotificationOptions(
+        showNotification: false,
+        playSound: false,
+      ),
+      foregroundTaskOptions: ForegroundTaskOptions(
+        eventAction: ForegroundTaskEventAction.nothing(),
+        autoRunOnBoot: true,
+        autoRunOnMyPackageReplaced: true,
+        allowWakeLock: true,
+        allowWifiLock: true,
+      ),
+    );
+  }
+
+  Future<ServiceRequestResult> _startService() async {
+    if (await FlutterForegroundTask.isRunningService) {
+      return FlutterForegroundTask.restartService();
+    } else {
+      return FlutterForegroundTask.startService(
+        serviceId: 256,
+        notificationTitle: 'HTTP Server is running',
+        notificationText: 'http://${_taskHandler.localIp}:${_taskHandler.port}',
+        notificationIcon: null,
+        // notificationButtons: [
+        //   const NotificationButton(id: 'btn_hello', text: 'Stop Server'),
+        // ],
+        // callback: startCallback,
+      );
+    }
+  }
+
+  Future<ServiceRequestResult> _stopService() {
+    return FlutterForegroundTask.stopService();
+  }
 
   @override
   void initState() {
+    _requestPermissions();
+    _initService();
     DatabaseHelper().updateStream();
     super.initState();
   }
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -120,7 +161,7 @@ class _MyAppState extends State<MyApp> {
           children: [
             // Section: IP Information
             SectionTitle(title: "IP Information"),
-            IPSection(widget: widget),
+            IPSection(widget: _taskHandler),
             Divider(),
             // Section: SMS Messages
             SectionTitle(title: "SMS Messages"),
@@ -175,7 +216,7 @@ class _MyAppState extends State<MyApp> {
             Divider(),
             ElevatedButton(
               onPressed: () {
-                if (widget._localIp == "Not started") {
+                if (_taskHandler.localIp == "Not started") {
                   _startServer();
                 } else {
                   _stopServer();
@@ -188,7 +229,7 @@ class _MyAppState extends State<MyApp> {
                     borderRadius: BorderRadius.circular(12)),
               ),
               child: Text(
-                widget._localIp == "Not started"
+                _taskHandler.localIp == "Not started"
                     ? "Start Server"
                     : "Stop Server",
                 style: TextStyle(fontSize: 18, color: Colors.white),
@@ -235,7 +276,7 @@ class IPSection extends StatelessWidget {
     required this.widget,
   });
 
-  final MyApp widget;
+  final MyTaskHandler widget;
 
   @override
   Widget build(BuildContext context) {
@@ -247,7 +288,7 @@ class IPSection extends StatelessWidget {
           Row(
             children: [
               Text(
-                "Local IP: ${widget._localIp}${widget._port != null ? ':${widget._port}' : ''}",
+                "Local IP: ${widget.localIp}${widget.port != null ? ':${widget.port}' : ''}",
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
@@ -255,13 +296,13 @@ class IPSection extends StatelessWidget {
                   fontFamily: 'RobotoMono',
                 ),
               ),
-              if (widget._localIp != "Not started")
+              if (widget.localIp != "Not started")
                 TextButton(
                   onPressed: () {
                     Clipboard.setData(
                       ClipboardData(
                           text:
-                              '${widget._localIp}${widget._port != null ? ':${widget._port}' : ''}'),
+                              '${widget.localIp}${widget.port != null ? ':${widget.port}' : ''}'),
                     );
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text(
@@ -285,7 +326,7 @@ class IPSection extends StatelessWidget {
           Row(
             children: [
               Text(
-                "Public IP: ${widget._publicIp}:${widget._port != null ? widget._port : ''}",
+                "Public IP: ${widget.publicIp}:${widget.port != null ? widget.port : ''}",
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.bold,
@@ -293,11 +334,11 @@ class IPSection extends StatelessWidget {
                   fontFamily: 'RobotoMono',
                 ),
               ),
-              if (widget._publicIp != "Fetching..." &&
-                  !widget._publicIp.startsWith("Error"))
+              if (widget.publicIp != "Fetching..." &&
+                  !widget.publicIp.startsWith("Error"))
                 TextButton(
                   onPressed: () {
-                    Clipboard.setData(ClipboardData(text: widget._publicIp));
+                    Clipboard.setData(ClipboardData(text: widget.publicIp));
                     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                       content: Text(
                         'Public IP copied to clipboard!',
