@@ -1,166 +1,189 @@
-# my_sms
+# REST API Documentation for SMS Gateway: Flutter  
 
-This is a simple flutter app that sends and receives SMS using local computer as server
-The app currently only works on Windows and Linux
-The computer needs to have a working internet connection and a phone connected to the computer
-
-## API Endpoints
-
-### POST /sms
-
-Send SMS to the given phone number
-
-- body:
-  - phone_number: string
-  - message: string
-
-### GET /sms
-
-Get all received SMS
-
-- query:
-  - phone_number: string
-
-### GET /sms/:id
-
-Get the SMS with the given ID
-
-- path:
-  - id: string
-
-### DELETE /sms/:id
-
-
-Here is the documentation based on the provided JSON:
+This documentation outlines the API endpoints for the **SMS Gateway** application. It details each endpoint's functionality, request/response structure, and example use cases.  
 
 ---
 
-# REST API Documentation for SMS Gateway: Flutter
+## Overview  
 
-This documentation provides an overview of the REST API endpoints for the SMS Gateway application, including the purpose of each endpoint, request methods, sample payloads, and response expectations.
-
----
-
-## Overview
-
-### Base URL
+### **Base URL**  
+The base URL serves as the entry point for all API requests:  
 **`{{base_url}}`**  
-Example: `https://postman-rest-api-learner.glitch.me/`
+Example: `https://localhost:8080/`  
 
 ---
 
-## Endpoints
+## Endpoints  
 
-### 1. **Get SMS**
+### 1. **Retrieve SMS Messages**  
 
-#### **Description**
-Retrieve SMS data from the server. This endpoint performs a `GET` request and does not require a request body.
+#### **Description**  
+This endpoint retrieves all SMS messages stored on the server.  
 
-#### **Request**
-- **Method:** `GET`
-- **URL:** `{{base_url}}/sms`
+#### **Request**  
+- **Method:** `GET`  
+- **URL:** `{{base_url}}/sms`  
+- **Headers:** None required  
 
-#### **Tests**
-- Checks if the status code is `200 OK`.
+#### **Query Parameters**  
+You can optionally include query parameters to filter results:  
+- **`phone_number`** (optional): Filter messages by the associated phone number.  
 
-#### **Sample Test Code**
+#### **Example Request**  
+```http
+GET https://localhost:8080/sms
+```  
+
+#### **Response**  
+- **Status Code:** `200 OK`  
+- **Body:** JSON array containing SMS records  
+
+#### **Postman Test Code**  
 ```javascript
 pm.test("Status code is 200", function () {
     pm.response.to.have.status(200);
 });
-```
+```  
 
 ---
 
-### 2. **Send SMS**
+### 2. **Send an SMS**  
 
-#### **Description**
-Send an SMS by submitting a JSON payload in the request body. This endpoint performs a `POST` request.
+#### **Description**  
+This endpoint allows you to send an SMS by providing a recipient's phone number and a message in the request body.  
 
-#### **Request**
-- **Method:** `POST`
-- **URL:** `{{base_url}}/sms`
-- **Headers:** None
-- **Body:**
+#### **Request**  
+- **Method:** `POST`  
+- **URL:** `{{base_url}}/sms`  
+- **Headers:**  
+  - `Content-Type`: `application/json`  
+- **Body:** JSON object  
   ```json
   {
       "number": "+1234567890",
       "message": "Hello, this is a test message!"
   }
-  ```
+  ```  
 
-#### **Response**
-A successful POST request typically returns:
-- **Status Codes:** `200 OK` or `201 Created`.
+#### **Example Request**  
+```http
+POST https://localhost:8080/sms
+Content-Type: application/json
 
-#### **Tests**
-- Validates that the response code is one of `[200, 201]`.
+{
+    "number": "+1234567890",
+    "message": "Hello, this is a test message!"
+}
+```  
 
-#### **Sample Test Code**
+#### **Response**  
+- **Status Code:**  
+  - `200 OK` or  
+  - `201 Created`  
+- **Body:** JSON confirmation of the message sent  
+
+#### **Postman Test Code**  
 ```javascript
 pm.test("Successful POST request", function () {
     pm.expect(pm.response.code).to.be.oneOf([200, 201]);
 });
-```
+```  
 
 ---
 
-### 3. **Delete SMS**
+### 3. **Delete an SMS**  
 
-#### **Description**
-Delete an SMS record by specifying its identifier in the URL. This endpoint performs a `DELETE` request.
+#### **Description**  
+This endpoint deletes a specific SMS record by its unique identifier (`id`).  
 
-#### **Request**
-- **Method:** `DELETE`
-- **URL:** `{{base_url}}/sms/2`  
-  *(Replace `2` with the actual ID of the SMS to delete)*
-- **Headers:** None
-- **Body:** Empty
+#### **Request**  
+- **Method:** `DELETE`  
+- **URL:** `{{base_url}}/sms/:id`  
+  *(Replace `:id` with the actual SMS ID)*  
+- **Headers:** None required  
+- **Body:** Empty  
 
-#### **Response**
-A successful DELETE request typically returns:
-- **Status Codes:** `200 OK`, `202 Accepted`, or `204 No Content`.
+#### **Example Request**  
+```http
+DELETE https://localhost:8080/sms/2
+```  
 
-#### **Tests**
-- Validates that the response code is one of `[200, 202, 204]`.
+#### **Response**  
+- **Status Code:**  
+  - `200 OK`  
+  - `202 Accepted`  
+  - `204 No Content`  
 
-#### **Sample Test Code**
+#### **Postman Test Code**  
 ```javascript
 pm.test("Successful DELETE request", function () {
     pm.expect(pm.response.code).to.be.oneOf([200, 202, 204]);
 });
-```
+```  
 
 ---
 
-## Variables
+## Variables  
 
-### Defined Variables
-1. **`id`**
-   - **Value:** `1`
-   - **Description:** Represents the ID for specific operations like GET or DELETE.
+### Defined Variables  
+These variables allow dynamic usage of the API:  
 
-2. **`base_url`**
-   - **Value:** `https://postman-rest-api-learner.glitch.me/`
-   - **Description:** The base URL for the API.
+1. **`base_url`**  
+   - **Value:** `https://localhost:8080/`  
+   - **Description:** The root URL for the API.  
+
+2. **`id`**  
+   - **Value:** `1`  
+   - **Description:** Represents the identifier for specific SMS records used in GET and DELETE requests.  
 
 ---
 
-## Additional Notes
+## Usage Guidelines  
 
-### Tests
-Postman tests are included for each endpoint to ensure the API's expected behavior. The tests check for:
-- Successful status codes
-- Proper responses to CRUD operations
+1. Set the **`base_url`** variable to point to your API server.  
+2. Use the provided endpoints to perform CRUD operations.  
+3. Ensure that you have a stable internet connection for server communication.  
 
-### Prerequest Scripts
-No prerequest scripts are defined in the current configuration.
+---
 
-### How to Use
-1. Set the `base_url` variable to the desired API server.
-2. Use the endpoints as described for CRUD operations.
-3. Ensure you have proper network permissions to access the `base_url`.
+## Additional Information  
 
---- 
+### Postman Tests  
+Each endpoint includes a predefined Postman test to verify expected behavior. These tests ensure:  
+- Correct status codes are returned (`200`, `201`, etc.)  
+- Proper response formats for all CRUD operations  
 
-This concludes the REST API documentation for SMS Gateway: Flutter. If you have any questions or require further clarification, feel free to ask!
+### Prerequest Scripts  
+No prerequest scripts are defined in the current configuration.  
+
+---
+
+## Examples  
+
+### Example 1: Retrieve All SMS Messages  
+```bash
+curl -X GET "{{base_url}}/sms"
+```  
+
+### Example 2: Send an SMS  
+```bash
+curl -X POST "{{base_url}}/sms" \
+-H "Content-Type: application/json" \
+-d '{
+    "number": "+1234567890",
+    "message": "Hello, this is a test message!"
+}'
+```  
+
+### Example 3: Delete an SMS  
+```bash
+curl -X DELETE "{{base_url}}/sms/2"
+```  
+
+---
+
+## Notes  
+- This application is a proof-of-concept and may require additional features for production use.  
+- Ensure the server is configured correctly and accessible at the specified base URL.  
+
+For additional questions or support, refer to the development team.  
